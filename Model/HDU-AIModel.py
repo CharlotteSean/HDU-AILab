@@ -34,7 +34,6 @@ from keras.callbacks import Callback
 # Hyperparameter
 train_data = json.load(open('../train_data.json', encoding='utf-8'))
 val_data = json.load(open('../val_data.json', encoding='utf-8'))
-test_data = json.load(open('../test_data.json', encoding='utf-8'))
 id2char, char2id = json.load(open('../word_embedding.json', encoding='utf-8'))
 id2predicate, predicate2id = json.load(open('../schemas.json', encoding='utf-8'))
 id2predicate = {int(i):j for i,j in id2predicate.items()}

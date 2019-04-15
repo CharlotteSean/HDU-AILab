@@ -175,65 +175,63 @@ def data_prediction(text_in):
     return list(set(R))
 
 # Model
-def build_model():
-    t = Input(shape=(None,))
-    s1 = Input(shape=(None,))
-    s2 = Input(shape=(None,))
-    k1 = Input(shape=(1,))
-    k2 = Input(shape=(1,))
-    o1 = Input(shape=(None,))
-    o2 = Input(shape=(None,))
-    # Defining the one-hot mask code
-    mask = Lambda(lambda x: K.cast(K.greater(K.expand_dims(x, 2), 0), 'float32'))(t)
-    # Word embedding
-    t = Embedding(len(char2id) + 2, char_size)(t)
-    t = Dropout(0.25)(t)
-    t = Lambda(lambda x: x[0] * x[1])([t, mask])
-    t = Bidirectional(CuDNNLSTM(char_size // 2, return_sequences=True))(t)
-    t = Bidirectional(CuDNNLSTM(char_size // 2, return_sequences=True))(t)
-    t_max = Lambda(maxpool)([t, mask])
-    t_dim = K.int_shape(t)[-1]
-    h = Lambda(vector, output_shape=(None, t_dim * 2))([t, t_max])
-    h = Conv1D(char_size, 3, activation='relu', padding='same')(h)
-    ps1 = Dense(1, activation='sigmoid')(h)
-    ps2 = Dense(1, activation='sigmoid')(h)
-    # Subject model
-    subject_model = Model(t, [ps1, ps2])
-    k1 = Lambda(gather, output_shape=(t_dim,))([t, k1])
-    k2 = Lambda(gather, output_shape=(t_dim,))([t, k2])
-    k = Concatenate()([k1, k2])
-    h = Lambda(vector, output_shape=(None, t_dim * 2))([t, t_max])
-    h = Lambda(vector, output_shape=(None, t_dim * 4))([h, k])
-    h = Conv1D(char_size, 3, activation='relu', padding='same')(h)
-    po1 = Dense(num_classes + 1, activation='softmax')(h)
-    po2 = Dense(num_classes + 1, activation='softmax')(h)
-    # Object model
-    object_model = Model([t, k1, k2], [po1, po2])
-    # Predicate model
-    predicate_model = Model([t, s1, s2, k1, k2, o1, o2], [ps1, ps2, po1, po2])
-    return subject_model, object_model, predicate_model, t, s1, s2, k1, k2, o1, o2, mask, ps1, ps2, po1, po2
+t_in = Input(shape=(None,))
+s1_in = Input(shape=(None,))
+s2_in = Input(shape=(None,))
+k1_in = Input(shape=(1,))
+k2_in = Input(shape=(1,))
+o1_in = Input(shape=(None,))
+o2_in = Input(shape=(None,))
+t, s1, s2, k1, k2, o1, o2 = t_in, s1_in, s2_in, k1_in, k2_in, o1_in, o2_in
+# Defining the one-hot mask code
+mask = Lambda(lambda x: K.cast(K.greater(K.expand_dims(x, 2), 0), 'float32'))(t)
+# Word embedding
+t = Embedding(len(char2id) + 2, char_size)(t)
+t = Dropout(0.25)(t)
+t = Lambda(lambda x: x[0] * x[1])([t, mask])
+t = Bidirectional(CuDNNLSTM(char_size // 2, return_sequences=True))(t)
+t = Bidirectional(CuDNNLSTM(char_size // 2, return_sequences=True))(t)
+t_max = Lambda(maxpool)([t, mask])
+t_dim = K.int_shape(t)[-1]
+h = Lambda(vector, output_shape=(None, t_dim * 2))([t, t_max])
+h = Conv1D(char_size, 3, activation='relu', padding='same')(h)
+ps1 = Dense(1, activation='sigmoid')(h)
+ps2 = Dense(1, activation='sigmoid')(h)
+# Subject model
+subject_model = Model(t_in, [ps1, ps2])
+k1 = Lambda(gather, output_shape=(t_dim,))([t, k1])
+k2 = Lambda(gather, output_shape=(t_dim,))([t, k2])
+k = Concatenate()([k1, k2])
+h = Lambda(vector, output_shape=(None, t_dim * 2))([t, t_max])
+h = Lambda(vector, output_shape=(None, t_dim * 4))([h, k])
+h = Conv1D(char_size, 3, activation='relu', padding='same')(h)
+po1 = Dense(num_classes + 1, activation='softmax')(h)
+po2 = Dense(num_classes + 1, activation='softmax')(h)
+# Object model
+object_model = Model([t_in, k1_in, k2_in], [po1, po2])
+# Predicate model
+predicate_model = Model([t_in, s1_in, s2_in, k1_in, k2_in, o1_in, o2_in], [ps1, ps2, po1, po2])
 
 # Defining the loss function
-def loss_function():
-    s1_loss = K.binary_crossentropy(s1, ps1)
-    s1_loss = K.sum(s1_loss * mask) / K.sum(mask)
-    s2_loss = K.binary_crossentropy(s2, ps2)
-    s2_loss = K.sum(s2_loss * mask) / K.sum(mask)
-    o1_loss = K.sparse_categorical_crossentropy(o1, po1)
-    o1_loss = K.sum(o1_loss * mask[:, :, 0]) / K.sum(mask)
-    o2_loss = K.sparse_categorical_crossentropy(o2, po2)
-    o2_loss = K.sum(o2_loss * mask[:, :, 0]) / K.sum(mask)
-    loss = 2.5 * (s1_loss + s2_loss) + (o1_loss + o2_loss)
-    return loss
+s1 = K.expand_dims(s1, 2)
+s2 = K.expand_dims(s2, 2)
+s1_loss = K.binary_crossentropy(s1, ps1)
+s1_loss = K.sum(s1_loss * mask) / K.sum(mask)
+s2_loss = K.binary_crossentropy(s2, ps2)
+s2_loss = K.sum(s2_loss * mask) / K.sum(mask)
+o1_loss = K.sparse_categorical_crossentropy(o1, po1)
+o1_loss = K.sum(o1_loss * mask[:, :, 0]) / K.sum(mask)
+o2_loss = K.sparse_categorical_crossentropy(o2, po2)
+o2_loss = K.sum(o2_loss * mask[:, :, 0]) / K.sum(mask)
+loss = 2.5 * (s1_loss + s2_loss) + (o1_loss + o2_loss)
 
 # Train model
-def train_model(loss):
-    predicate_model.add_loss(loss)
-    predicate_model.compile(optimizer='adam')
-    predicate_model.summary()
-    train_D = data_preprocessing(train_data)
-    predicate_model.fit_generator(train_D.__iter__(), steps_per_epoch=len(train_D), epochs=20, callbacks=[Evaluate()])
-    predicate_model.load_weights('../model.weights')
+predicate_model.add_loss(loss)
+predicate_model.compile(optimizer='adam')
+predicate_model.summary()
+train_D = data_preprocessing(train_data)
+predicate_model.fit_generator(train_D.__iter__(), steps_per_epoch=len(train_D), epochs=20, callbacks=[Evaluate()])
+predicate_model.load_weights('../model.weights')
 
 subject_model, object_model, predicate_model, t, s1, s2, k1, k2, o1, o2, mask, ps1, ps2, po1, po2= build_model()
 train_model(loss_function())

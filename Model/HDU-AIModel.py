@@ -233,9 +233,6 @@ train_D = data_preprocessing(train_data)
 predicate_model.fit_generator(train_D.__iter__(), steps_per_epoch=len(train_D), epochs=20, callbacks=[Evaluate()])
 predicate_model.load_weights('../model.weights')
 
-subject_model, object_model, predicate_model, t, s1, s2, k1, k2, o1, o2, mask, ps1, ps2, po1, po2= build_model()
-train_model(loss_function())
-
 # Write json file
 with open('../test_data.json', encoding='utf-8') as f:
     for l in tqdm(f):
